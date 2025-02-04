@@ -77,6 +77,8 @@ res.send('todo okkk')
 
 
 // Iniciar el servidor
+
 app.listen(PORT, () => {
-  console.log(`Servidor corriendo en ${SERVER_URL}:${PORT}`);
+  console.log(`Servidor corriendo en el puerto ${PORT}`);
 });
+
