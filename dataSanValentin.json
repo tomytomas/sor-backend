@@ -1,0 +1,30 @@
+[
+  {
+    "id": 1,
+    "title": "Box chocobento",
+    "description": "2 mini tortas brownies, 1 torta oreo, 1 chocotorta",
+    "price": "14000",
+    "image": "https://i.pinimg.com/736x/22/7a/37/227a3751d5d3eb322a83d220485fb4d6.jpg"
+  },
+  {
+    "id": 1738349852277,
+    "title": "Mini Tartitas frutales 4 unidades",
+    "description": "Descubre el placer de nuestras Mini Tartitas frutales (sabores a elección)",
+    "price": "11000",
+    "image": "https://i.pinimg.com/736x/23/49/e3/2349e3c6fa72e19a6c5b98ef59a22348.jpg"
+  },
+  {
+    "id": 1738442824460,
+    "title": "Caja de alfajores ",
+    "description": "(4 unidades)",
+    "price": "5500",
+    "image": "https://i.pinimg.com/736x/fd/9a/c0/fd9ac0d92575766feb040939bbb3a3c5.jpg"
+  },
+  {
+    "id": 1738450849248,
+    "title": "Torta bento San valentin",
+    "description": "Mini torta de vainilla con chantilly",
+    "price": "12000",
+    "image": "https://i.pinimg.com/736x/76/5a/56/765a567f9e067d413925df85def2c7eb.jpg"
+  }
+]
