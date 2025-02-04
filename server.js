@@ -26,6 +26,7 @@ const mercadopagoClient = new MercadoPagoConfig({
 
 app.get('/', (req, res) => {
   res.send('¡Hola Mundo desde el backend! 🌎');
+  res.send('¡El servidor está funcionando correctamente! 🚀');
 });
 app.post("/create_preference", async (req, res) => {
   try {
@@ -78,7 +79,7 @@ res.send('todo okkk')
 
 // Iniciar el servidor
 
-app.listen(PORT, () => {
+app.listen(PORT, '0.0.0.0', () => {
   console.log(`Servidor corriendo en el puerto ${PORT}`);
 });
 
