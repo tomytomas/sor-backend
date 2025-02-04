@@ -13,7 +13,7 @@ router.get("/refreshAdmin", async (req, res) => {
   const user = "santiago_lucas10@hotmail.com";
   
   console.log(req.session.user);
-  const jwtt = jwt.sign({ bearer: user }, process.env.JWT_SECRET, { expiresIn: "1h" });
+  const jwtt = jwt.sign({ bearer: user }, process.env.SECRET_KEY, { expiresIn: "1h" });
 
   res.json({ jwtAdmin: jwtt });
 });
