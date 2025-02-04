@@ -4,6 +4,7 @@ import cors from "cors";
 import 'dotenv/config'
 const app = express();
 const PORT = process.env.PORT || 5000;
+const SERVER_URL = process.env.URL || "http://localhost";
 import session from "express-session";
 import productsRouter from "./Routes/products.js";
 import datos from "./Routes/datos.js";
@@ -74,5 +75,5 @@ res.send('todo okkk')
 
 // Iniciar el servidor
 app.listen(PORT, () => {
-  console.log(`Servidor corriendo en http://localhost:${PORT}`);
+  console.log(`Servidor corriendo en ${SERVER_URL}:${PORT}`);
 });
