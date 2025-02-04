@@ -1,8 +1,7 @@
 "use strict";
 import express from "express";
-import { compare } from "../util/passSegured.js";
 import jwt from "jsonwebtoken";
-import {getUser} from "../Models/mdlUsers.js";
+
 
 const router = express.Router();
 
