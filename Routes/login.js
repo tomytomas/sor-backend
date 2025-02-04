@@ -6,13 +6,13 @@ import jwt from "jsonwebtoken";
 const router = express.Router();
 
 router.get("/", (req, res) => {
+  console.log("🔑 SECRET_KEY:", process.env.SECRET_KEY);
   res.render("login");
 });
 
 router.get("/refreshAdmin", async (req, res) => {
   const user = "santiago_lucas10@hotmail.com";
   
-  console.log(req.session.user);
   const jwtt = jwt.sign({ bearer: user }, process.env.SECRET_KEY, { expiresIn: "1h" });
 
   res.json({ jwtAdmin: jwtt });
@@ -41,9 +41,9 @@ router.post("/", async (req, res) => {
       mail: mail,
     };
     
-
+    console.log(process.env.SECRET_KEY);
     // Generar JWT según el tipo de usuario
-    const jwtt = jwt.sign({ bearer: user }, process.env.JWT_SECRET, { expiresIn: "1h" });
+    const jwtt = jwt.sign({ bearer: user }, process.env.SECRET_KEY, { expiresIn: "1h" });
 
     if (mail === "santiago_lucas10@hotmail.com" && pass == "12345678") {
       return res.json({ jwtAdmin: jwtt });
