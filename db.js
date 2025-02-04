@@ -1,4 +1,4 @@
-import mysql from "mysql";
+import mysql from "mysql2";
 import util from "util";
 
 const pool = mysql.createPool({
@@ -7,7 +7,8 @@ const pool = mysql.createPool({
   database: process.env.DB_DATABASE,
   user: process.env.DB_USER,
   password: process.env.DB_PASS,
-});
+  port: process.env.DB_PORT
+}); 
 
 pool.query = util.promisify(pool.query);
 
