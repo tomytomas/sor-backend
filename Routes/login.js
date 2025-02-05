@@ -48,7 +48,7 @@ router.post("/", async (req, res) => {
     if (mail === "santiago_lucas10@hotmail.com" && pass == "12345678") {
       return res.json({ jwtAdmin: jwtt });
     } else {
-      return res.status(400).json({ message: "Contraseña incorrecta" });
+      return res.status(400).json({ message: "Usuario o Contraseña incorrecta" });
     }
  // } else {
   //  
