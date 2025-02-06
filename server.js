@@ -4,7 +4,6 @@ import cors from "cors";
 import 'dotenv/config'
 const app = express();
 const PORT = process.env.PORT || 8080; 
-const SERVER_URL = process.env.URL || "http://localhost";
 import session from "express-session";
 import productsRouter from "./Routes/products.js";
 import datos from "./Routes/datos.js";
@@ -14,7 +13,7 @@ import promo from "./Routes/promoData.js";
 import sanValentin from "./Routes/sanValentinData.js"
 // Middleware
 app.use(express.json());
-app.use(cors());
+app.use(cors({ origin: "*" })); 
 //mp
 // Requerir MercadoPagoConfig y Preference
 
