@@ -42,8 +42,8 @@ app.post("/create_preference", async (req, res) => {
       ],
       back_urls: {
         success: "https://martin-juncos.github.io/success/",
-        failure: "https://martin-juncos.github.io/failure/",
-        pending: "https://martin-juncos.github.io/pending/",
+        failure: "https://pasteleria-sele.vercel.app/",
+        pending: "https://pasteleria-sele.vercel.app/",
       },
       auto_return: "approved",
     };
