@@ -41,9 +41,9 @@ app.post("/create_preference", async (req, res) => {
         },
       ],
       back_urls: {
-        success: "https://pasteleria-sele.vercel.app/successcompra",
-        failure: "https://pasteleria-sele.vercel.app/",
-        pending: "https://pasteleria-sele.vercel.app/",
+        success: "https://pasteleria-sele-six.vercel.app/successcompra",
+        failure: "https://pasteleria-sele-six.vercel.app/",
+        pending: "https://pasteleria-sele-six.vercel.app/",
       },
       auto_return: "approved",
     };
