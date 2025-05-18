@@ -1,84 +1,125 @@
+const express = require("express");
+const path = require("path");
 
-import express from "express";
-import cors from "cors";
-import 'dotenv/config'
+
+const session = require("express-session");
+const morgan = require("morgan");
+const cors = require("cors");
+const { tokenVerify } = require("./util/handleJWT"); 
+require("dotenv").config();
 const app = express();
-const PORT = process.env.PORT || 8080; 
-import session from "express-session";
-import productsRouter from "./Routes/products.js";
-import datos from "./Routes/datos.js";
-import routeLogin from"./Routes/login.js";
-import destacados from "./Routes/destacadosData.js"
-import promo from "./Routes/promoData.js";
-import sanValentin from "./Routes/sanValentinData.js"
-// Middleware
-app.use(express.json());
-app.use(cors({ origin: "*" })); 
-//mp
-// Requerir MercadoPagoConfig y Preference
 
-import { MercadoPagoConfig, Preference } from "mercadopago";
 
-const mercadopagoClient = new MercadoPagoConfig({
-  accessToken:  'APP_USR-1324035573861209-012718-1820c10688370e97846d6b192fad5c3d-1249353678',
+
+app.use(cors({
+  origin: process.env.FRONTEND_URL || 'http://localhost:3000', // URL de tu frontend
+  methods: ['GET', 'POST', 'PUT', 'DELETE'], // Permitir otros métodos si es necesario
+  allowedHeaders: ['Content-Type', 'Authorization'], // Permitir encabezados como 'Authorization'
+  credentials: true, // Si estás trabajando con sesiones o cookies, habilita esto
+}));
+
+app.use((req, res, next) => {
+  res.setHeader('Referrer-Policy', 'no-referrer-when-downgrade');
+  next();
 });
 
-app.get('/', (req, res) => {
-  res.send('¡Hola Mundo desde el backend! 🌎');
-  res.send('¡El servidor está funcionando correctamente! 🚀');
-});
-app.post("/create_preference", async (req, res) => {
+
+//const data = require("./routes/datos")
+//const contact = require("./routes/contact"); 
+const routeRegister = require("./Routes/register");
+const routeLogin = require("./Routes/login");
+const RoutePost = require("./Routes/datos");
+const routermessages = require("./Routes/messages");
+
+
+
+
+app.use(express.static(path.resolve(__dirname, "./client/dist")))
+app.use(express.json())
+app.use(express.urlencoded({extended: true}))
+
+app.use(express.static(path.join(__dirname, "public")));
+
+
+
+app.use(
+  session({
+    secret: process.env.SESSION_SECRET || 'dev-secret',
+    resave: true,
+    saveUninitialized: true,
+  })
+);
+
+const isAuth = async (req, res, next) => {
+  const token = req.headers.authorization?.split(' ')[1]; // Extraer el JWT desde el header
+
+  if (!token) {
+    return res.status(401).json({ error: 'Token no proporcionado' });
+  }
+
   try {
-    console.log(req.body.title)
-    console.log(req.body.unit_price)
-    const body = {
-      items: [
-        {
-          title: req.body.title,
-          quantity: Number(req.body.quantity),
-          unit_price: req.body.unit_price,
-          currency_id: "ARS",
-        },
-      ],
-      back_urls: {
-        success: "https://pasteleria-sele-six.vercel.app/successcompra",
-        failure: "https://pasteleria-sele-six.vercel.app/",
-        pending: "https://pasteleria-sele-six.vercel.app/",
-      },
-      auto_return: "approved",
-    };
-    const preference = new Preference(mercadopagoClient);
-    const result = await preference.create({ body });
-    res.json({
-      id: result.id,
-    });
+    const user = await tokenVerify(token); // Verificar el JWT
+    if (!user) {
+      return res.status(401).json({ error: 'Token inválido' });
+    }
+    req.user = user; // Puedes agregar la info del usuario a la request
+    next();
   } catch (error) {
-    console.error(error);
-    res.status(500).send("Error creating preference");
+    return res.status(401).json({ error: 'Token inválido o expirado' });
+  }
+};
+
+app.use(morgan('tiny'));
+
+// 1. Autenticación y usuarios
+app.use("/register", routeRegister);
+app.use("/login", routeLogin);
+app.use("/messages", routermessages); // Middleware de autenticación para mensajes
+// 2. Datos o recursos protegidos
+app.use("/datos", RoutePost);
+
+// 3. Home y páginas públicas (si tienes vistas o SSR)
+
+app.post("/verify", async (req, res) => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    return res.sendStatus(401); // Unauthorized
+  }
+  const token = authHeader.split(" ")[1];
+  try {
+    const decoded = await tokenVerify(token);
+    return res.status(200).json({ access: true, user: decoded });
+  } catch (err) {
+    return res.status(401).json({ access: false, error: "Token inválido" });
   }
 });
 
-app.use("/datapromo", promo)
-app.use("/datasanvalentin", sanValentin)
-app.use("/datadestacada", destacados)
-app.use("/products", productsRouter)
-app.use("/login", routeLogin);
-app.use("/datos", datos);
-app.use("/success", async (req, res) => {
-app.use(
-    session({
-      secret: "keyboard cat",
-      resave: true,
-      saveUninitialized: true,
-    })
-  );
-res.send('todo okkk')
+app.get("/test-db", async (req, res) => {
+  try {
+    const result = await pool.query("SELECT NOW()");
+    res.json({ ok: true, serverTime: result.rows[0].now });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
 });
 
+//catch all route (404)
+app.use((req, res, next) => {
+  let error = new Error("Recurso no encontrado");
+  error.status = 404
+  next(error)
+})
 
-// Iniciar el servidor
+app.use((error, req, res, next) => {
+  if (!error.status) {
+      error.status = 500
+  }
+  res.status(error.status).json({ status: error.status, message: "no se pudo cargar la pagina" })
+})
 
-app.listen(PORT, '0.0.0.0', () => {
-  console.log(`Servidor corriendo en el puerto ${PORT}`);
+const PORT = process.env.PORT || 8080;
+app.listen(PORT, '0.0.0.0', (err) => {
+  err
+  ? console.log("explotó todo 😫")
+  : console.log(`Servidor corre en http://localhost:${PORT}`);
 });
-

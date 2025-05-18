@@ -1,24 +1,21 @@
-import mysql from "mysql2";
-import util from "util";
+const { Pool } = require("pg");
+require("dotenv").config();
 
-const pool = mysql.createPool({
-  connectionLimit: 10,
-  host: process.env.DB_HOST,
-  database: process.env.DB_DATABASE,
-  user: process.env.DB_USER,
-  password: process.env.DB_PASS,
-  port: process.env.DB_PORT
-}); 
-pool.getConnection((err, connection) => {
-  if (err) {
-    console.error("❌ Error en la conexión a la base de datos:", err);
-  } else {
-    console.log("✅ Conectado correctamente a la base de datos");
-    connection.release(); // Liberar la conexión después de la prueba
-  }
+const pool = new Pool({
+  user: 'postgres',
+  host: 'localhost',
+  database: 'postgres',
+  password: 'leloir2020',
+  port: 5432
 });
 
+// Test de conexión
+pool.query("SELECT NOW()")
+  .then((res) => {
+    console.log("✅ Conectado a PostgreSQL. Hora del servidor:", res.rows[0].now);
+  })
+  .catch((err) => {
+    console.error("❌ Error al conectar a PostgreSQL:", err.message);
+  });
 
-pool.query = util.promisify(pool.query);
-
-export default pool;
+module.exports = pool;
