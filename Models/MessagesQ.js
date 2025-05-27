@@ -1,71 +1,83 @@
 // models/messages.js
 const pool = require("../db");
-const { encryptMessage, decryptMessage } = require("../utils/crypto");
-
 const MessageModel = {
-  // Obtener mensajes entre dos usuarios (desencriptados)
-  getMessagesBetweenUsers: async (userId, chatUserId) => {
+// crear msj
+create: async ({ remit_id, destin_id, encrypt_message, date, read }) => {
     const query = `
-      SELECT m.id, m.sender_id, m.receiver_id, m.message, m.created_at, u.name AS sender_name
-      FROM messages m
-      JOIN users u ON m.sender_id = u.id
-      WHERE (m.sender_id = $1 AND m.receiver_id = $2) OR (m.sender_id = $2 AND m.receiver_id = $1)
-      ORDER BY m.created_at ASC;
+      INSERT INTO messages (remit_id, destin_id, encrypt_message, date, read)
+      VALUES ($1, $2, $3, $4, $5)
+      RETURNING *;
+    `;
+    const values = [remit_id, destin_id, encrypt_message, date, read];
+    const result = await pool.query(query, values);
+    return result.rows[0];
+  },
+
+  // Obtener usuario por ID
+getUserById: async (userId) => {
+  const query = `
+    SELECT name 
+    FROM users
+    WHERE id = $1;
+  `;
+  const result = await pool.query(query, [userId]);
+  return result.rows[0];
+},
+
+
+
+  // Obtener mensajes entre dos usuarios (sin desencriptar)
+     getMessagesBetweenUsers: async (userId, chatUserId) => {
+    const query = `
+      SELECT id, remit_id, destin_id, encrypt_message, date, read
+      FROM messages
+      WHERE (remit_id = $1 AND destin_id = $2) 
+         OR (remit_id = $2 AND destin_id = $1)
+      ORDER BY date ASC;
     `;
     const result = await pool.query(query, [userId, chatUserId]);
-
-    // Desencriptar mensajes
-    return result.rows.map((msg) => ({
-      id: msg.id,
-      senderId: msg.sender_id,
-      receiverId: msg.receiver_id,
-      senderName: msg.sender_name,
-      message: decryptMessage(userId, msg.message),
-      createdAt: msg.created_at,
-    }));
+  
+    return result.rows;
   },
 
-  // Obtener mensajes no leídos (desencriptados)
+
+
+   // Marcar como leídos todos los mensajes recibidos de un remitente
+  markMessagesAsRead: async (userId, chatUserId) => {
+    const query = `
+      UPDATE messages
+      SET read = true
+      WHERE destin_id = $1 AND remit_id = $2 AND read = false;
+    `;
+    await pool.query(query, [userId, chatUserId]);
+  },
+
+  // Obtener mensajes no leídos con nombre del remitente
   getUnreadMessages: async (userId) => {
     const query = `
-      SELECT m.id, m.sender_id, m.receiver_id, m.message, m.created_at, u.name AS sender_name
+      SELECT 
+        m.id,
+        m.remit_id,
+        m.destin_id,
+        m.encrypt_message,
+        m.date,
+        m.read,
+        u.name AS sender_name
       FROM messages m
-      JOIN users u ON m.sender_id = u.id
-      WHERE m.receiver_id = $1 AND m.read = false
-      ORDER BY m.created_at DESC;
+      JOIN users u ON m.remit_id = u.id
+      WHERE m.destin_id = $1 AND m.read = false
+      ORDER BY m.date DESC;
     `;
     const result = await pool.query(query, [userId]);
-
-    // Desencriptar mensajes
-    return result.rows.map((msg) => ({
-      id: msg.id,
-      senderId: msg.sender_id,
-      receiverId: msg.receiver_id,
-      senderName: msg.sender_name,
-      message: decryptMessage(userId, msg.message),
-      createdAt: msg.created_at,
-    }));
+    return result.rows;
   },
 
-  // Obtener mensajes recibidos y desencriptados
-  getReceivedMessages: async (userId) => {
-    const query = "SELECT id, sender_id, message, read FROM messages WHERE receiver_id = $1";
-    const result = await pool.query(query, [userId]);
+ 
 
-    // Desencriptar mensajes
-    return result.rows.map((msg) => ({
-      id: msg.id,
-      senderId: msg.sender_id,
-      message: decryptMessage(userId, msg.message),
-      read: msg.read,
-    }));
-  },
-
-  // Enviar un mensaje encriptado
-  sendMessage: async (senderId, receiverId, message) => {
-    const encryptedMessage = encryptMessage(receiverId, message);
-    const query = "INSERT INTO messages (sender_id, receiver_id, message, read) VALUES ($1, $2, $3, $4)";
-    await pool.query(query, [senderId, receiverId, encryptedMessage, false]);
+  // Enviar un mensaje (sin encriptar)
+  sendMessage: async (senderId, receiverId, encryptedMessage) => {
+    const query = "INSERT INTO messages (remit_id, destin_id, encrypt_message, date, read) VALUES ($1, $2, $3, NOW(), false)";
+    await pool.query(query, [senderId, receiverId, encryptedMessage]);
   },
 
   // Marcar mensaje como leído
@@ -73,10 +85,11 @@ const MessageModel = {
     const query = `
       UPDATE messages
       SET read = true
-      WHERE id = $1 AND receiver_id = $2;
+      WHERE id = $1 AND destin_id = $2;
     `;
     await pool.query(query, [messageId, userId]);
   },
 };
 
 module.exports = MessageModel;
+

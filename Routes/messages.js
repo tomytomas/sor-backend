@@ -3,9 +3,57 @@ const express = require("express");
 const router = express.Router();
 const MessageModel = require("../Models/MessagesQ");
 const UserModel = require("../Models/UserModel");
-const { decryptMessage, encryptMessage } = require("../utils/crypto");
+const { decryptMessage} = require("../utils/crypto");
 const path = require("path"); // ✅ Asegúrate de importar 'path'
 const fs = require("fs");
+
+
+// 📥 Obtener mensajes no leídos con el nombre del remitente
+router.get("/unread/:userId", async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    // Validación básica
+    if (!userId || isNaN(userId)) {
+      return res.status(400).json({ message: "ID de usuario inválido" });
+    }
+
+    console.log(`🔍 Buscando mensajes no leídos para el usuario ${userId}`);
+    
+    const messages = await MessageModel.getUnreadMessages(userId);
+
+    if (!messages || messages.length === 0) {
+      return res.status(200).json([]); // No hay mensajes no leídos
+    }
+
+    const decryptedMessages = messages.map((msg) => {
+      let decryptedText = null;
+      if (msg.encrypt_message) {
+        try {
+          decryptedText = decryptMessage(msg.encrypt_message);
+        } catch (error) {
+          console.error(`❌ Error desencriptando mensaje ID ${msg.id}:`, error.message);
+        }
+      }
+
+      return {
+        id: msg.id,
+        senderId: msg.remit_id,
+        senderName: msg.sender_name, // ✅ nombre del remitente
+        receiverId: msg.destin_id,
+        message: decryptedText,
+        createdAt: msg.date,
+        read: msg.read,
+      };
+    });
+
+    res.status(200).json(decryptedMessages);
+  } catch (error) {
+    console.error("❌ Error al obtener los mensajes no leídos:", error);
+    res.status(500).json({ message: "Error interno del servidor" });
+  }
+});
+
 
 
 // 📥 Obtener mensajes entre dos usuarios
@@ -13,35 +61,50 @@ router.get("/:userId/:chatUserId", async (req, res) => {
   try {
     console.log("Obteniendo mensajes entre usuarios");
     const { userId, chatUserId } = req.params;
-    //const messages = await MessageModel.getMessagesBetweenUsers(userId, chatUserId);
-    const Message = "hola me desencripteaste";
-     const name = "pepe";
-     const fecha = new Date(2025, 4, 13);
-    /* Desencriptar los mensajes
-    const decryptedMessages = messages.map((msg) => ({
-      id: msg.id,
-      senderId: msg.sender_id,
-      receiverId: msg.receiver_id,
-      senderName: msg.sender_name,
-      message: decryptMessage(msg.message),
-      createdAt: msg.created_at,
-    }));*/
-    // Desencriptar los mensajes
-    const decryptedMessages = [{
-      id: 1,
-      senderId: 20,
-      receiverId: 5,
-      senderName: name,
-      message: Message,
-      createdAt: fecha,
-    }];
+
+    const messages = await MessageModel.getMessagesBetweenUsers(userId, chatUserId);
+
+    if (!messages || messages.length === 0) {
+      console.warn(`No hay mensajes entre los usuarios ${userId} y ${chatUserId}`);
+      return res.status(200).json([]);
+    }
+
+    // Marcar como leídos los mensajes que recibió el userId desde chatUserId
+    await MessageModel.markMessagesAsRead(userId, chatUserId);
+
+    const receiver = await MessageModel.getUserById(chatUserId);
+    const receiverName = receiver?.name || "Desconocido";
+
+    const decryptedMessages = messages.map((msg) => {
+      let decryptedText = null;
+      if (msg.encrypt_message) {
+        try {
+          decryptedText = decryptMessage(msg.encrypt_message);
+        } catch (error) {
+          console.error(`Error desencriptando mensaje id ${msg.id}:`, error.message);
+        }
+      }
+
+      return {
+        id: msg.id,
+        senderId: msg.remit_id,
+        receiverId: msg.destin_id,
+        message: decryptedText,
+        createdAt: msg.date,
+        read: msg.read,
+        receiverName: receiverName,
+      };
+    });
 
     res.status(200).json(decryptedMessages);
   } catch (error) {
     console.error("Error al obtener los mensajes:", error);
-    //res.status(500).json({ message: "Error al obtener los mensajes" });
+    res.status(500).json({ message: "Error al obtener los mensajes" });
   }
 });
+
+
+
 
 router.get("/public-key", async (req, res) => {
   try {
@@ -75,16 +138,22 @@ router.post("/send", async (req, res) => {
     console.log("Datos recibidos:", req.body);
     const { senderId, receiverId, message } = req.body;
 
-    // Desencriptar el mensaje para verificar el contenido en el servidor
-    const decryptedMessage = decryptMessage(message);
-    console.log("Mensaje desencriptado:", decryptedMessage);
-    /*
+    if (!senderId || !receiverId || !message) {
+      return res.status(400).json({ message: "Faltan datos obligatorios" });
+    }
+
+    // Extraer solo la hora
+   const currentTime = new Date().toISOString(); // UTC en formato completo y válido
+
+
     // Guardar el mensaje encriptado en la base de datos
     await MessageModel.create({
-      sender_id: senderId,
-      receiver_id: receiverId,
-      message, // Almacena el mensaje tal como llegó (encriptado)
-    });*/
+      remit_id: senderId,
+      destin_id: receiverId,
+      encrypt_message: message,
+      date: currentTime,
+      read: false
+    });
 
     res.status(200).json({ message: "Mensaje enviado correctamente" });
   } catch (error) {
@@ -92,6 +161,7 @@ router.post("/send", async (req, res) => {
     res.status(500).json({ message: "Error enviando mensaje" });
   }
 });
+
 
 
 // 📥 Obtener mensajes recibidos (desencriptados)
@@ -115,17 +185,7 @@ router.get("/received/:userId", async (req, res) => {
   }
 });
 
-// 📥 Obtener mensajes no leídos
-router.get("/unread/:userId", async (req, res) => {
-  try {
-    const { userId } = req.params;
-    //const messages = await MessageModel.getUnreadMessages(userId);
-   // res.status(200).json(messages);
-  } catch (error) {
-    console.error("Error al obtener los mensajes no leídos:", error);
-    res.status(500).json({ message: "Error al obtener los mensajes no leídos" });
-  }
-});
+
 
 // 📩 Marcar mensaje como leído
 router.put("/read", async (req, res) => {

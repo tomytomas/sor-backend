@@ -1,89 +1,88 @@
 const express = require("express");
 const path = require("path");
-
-
+const http = require("http");
 const session = require("express-session");
 const morgan = require("morgan");
 const cors = require("cors");
-const { tokenVerify } = require("./util/handleJWT"); 
+const { tokenVerify } = require("./util/handleJWT");
+const { decryptMessage } = require("./utils/crypto");
 require("dotenv").config();
+
 const app = express();
+const server = http.createServer(app);
 
-
-
-app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:3000', // URL de tu frontend
-  methods: ['GET', 'POST', 'PUT', 'DELETE'], // Permitir otros métodos si es necesario
-  allowedHeaders: ['Content-Type', 'Authorization'], // Permitir encabezados como 'Authorization'
-  credentials: true, // Si estás trabajando con sesiones o cookies, habilita esto
-}));
-
-app.use((req, res, next) => {
-  res.setHeader('Referrer-Policy', 'no-referrer-when-downgrade');
-  next();
+const { Server } = require("socket.io");
+const io = new Server(server, {
+  cors: {
+    origin: process.env.FRONTEND_URL || "http://localhost:3000",
+    methods: ["GET", "POST", "PUT", "DELETE"],
+    credentials: true,
+  },
 });
 
-
-//const data = require("./routes/datos")
-//const contact = require("./routes/contact"); 
+// 📦 Rutas
 const routeRegister = require("./Routes/register");
 const routeLogin = require("./Routes/login");
 const RoutePost = require("./Routes/datos");
 const routermessages = require("./Routes/messages");
 
+// 🌐 Middlewares
+app.use(
+  cors({
+    origin: process.env.FRONTEND_URL || "http://localhost:3000",
+    methods: ["GET", "POST", "PUT", "DELETE"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+    credentials: true,
+  })
+);
 
+app.use((req, res, next) => {
+  res.setHeader("Referrer-Policy", "no-referrer-when-downgrade");
+  next();
+});
 
-
-app.use(express.static(path.resolve(__dirname, "./client/dist")))
-app.use(express.json())
-app.use(express.urlencoded({extended: true}))
-
+app.use(express.static(path.resolve(__dirname, "./client/dist")));
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, "public")));
-
-
 
 app.use(
   session({
-    secret: process.env.SESSION_SECRET || 'dev-secret',
+    secret: process.env.SESSION_SECRET || "dev-secret",
     resave: true,
     saveUninitialized: true,
   })
 );
 
-const isAuth = async (req, res, next) => {
-  const token = req.headers.authorization?.split(' ')[1]; // Extraer el JWT desde el header
+app.use(morgan("tiny"));
 
-  if (!token) {
-    return res.status(401).json({ error: 'Token no proporcionado' });
-  }
+// 🔐 Verificación JWT
+const isAuth = async (req, res, next) => {
+  const token = req.headers.authorization?.split(" ")[1];
+  if (!token) return res.status(401).json({ error: "Token no proporcionado" });
 
   try {
-    const user = await tokenVerify(token); // Verificar el JWT
-    if (!user) {
-      return res.status(401).json({ error: 'Token inválido' });
-    }
-    req.user = user; // Puedes agregar la info del usuario a la request
+    const user = await tokenVerify(token);
+    if (!user) return res.status(401).json({ error: "Token inválido" });
+
+    req.user = user;
     next();
   } catch (error) {
-    return res.status(401).json({ error: 'Token inválido o expirado' });
+    return res.status(401).json({ error: "Token inválido o expirado" });
   }
 };
 
-app.use(morgan('tiny'));
-
-// 1. Autenticación y usuarios
+// 📌 Rutas API
 app.use("/register", routeRegister);
 app.use("/login", routeLogin);
-app.use("/messages", routermessages); // Middleware de autenticación para mensajes
-// 2. Datos o recursos protegidos
+app.use("/messages", routermessages);
 app.use("/datos", RoutePost);
 
-// 3. Home y páginas públicas (si tienes vistas o SSR)
-
+// 🧪 Test Token
 app.post("/verify", async (req, res) => {
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith("Bearer ")) {
-    return res.sendStatus(401); // Unauthorized
+    return res.sendStatus(401);
   }
   const token = authHeader.split(" ")[1];
   try {
@@ -94,32 +93,75 @@ app.post("/verify", async (req, res) => {
   }
 });
 
-app.get("/test-db", async (req, res) => {
-  try {
-    const result = await pool.query("SELECT NOW()");
-    res.json({ ok: true, serverTime: result.rows[0].now });
-  } catch (err) {
-    res.status(500).json({ ok: false, error: err.message });
-  }
-});
-
-//catch all route (404)
+// ⚠️ 404 handler
 app.use((req, res, next) => {
   let error = new Error("Recurso no encontrado");
-  error.status = 404
-  next(error)
-})
+  error.status = 404;
+  next(error);
+});
 
+// ⚠️ Error handler
 app.use((error, req, res, next) => {
-  if (!error.status) {
-      error.status = 500
-  }
-  res.status(error.status).json({ status: error.status, message: "no se pudo cargar la pagina" })
-})
+  if (!error.status) error.status = 500;
+  res
+    .status(error.status)
+    .json({ status: error.status, message: "no se pudo cargar la pagina" });
+});
 
+// 🔌 SOCKET.IO
+io.on("connection", (socket) => {
+  console.log("🟢 Usuario conectado:", socket.id);
+
+  socket.on("join_room", ({ userId, chatUserId }) => {
+    const roomId =
+      userId < chatUserId ? `${userId}_${chatUserId}` : `${chatUserId}_${userId}`;
+    socket.join(roomId);
+    console.log(`👤 Usuario ${userId} se unió a la sala ${roomId}`);
+  });
+
+  socket.on("leave_room", ({ userId, chatUserId }) => {
+    const roomId =
+      userId < chatUserId ? `${userId}_${chatUserId}` : `${chatUserId}_${userId}`;
+    socket.leave(roomId);
+    console.log(`👤 Usuario ${userId} salió de la sala ${roomId}`);
+  });
+
+  socket.on("send_message", (data) => {
+    console.log("📨 Mensaje cifrado recibido:", data);
+
+    const { senderId, receiverId, message, senderName } = data;
+
+    let decryptedMessage;
+    try {
+      decryptedMessage = decryptMessage(message);
+    } catch (err) {
+      console.error("❌ Error al desencriptar el mensaje:", err);
+      return;
+    }
+
+    const roomId =
+      senderId < receiverId ? `${senderId}_${receiverId}` : `${receiverId}_${senderId}`;
+
+    const messageToSend = {
+      ...data,
+      message: decryptedMessage,
+      senderName,
+    };
+
+    socket.to(roomId).emit("receive_message", messageToSend);
+  });
+
+  socket.on("disconnect", () => {
+    console.log("🔴 Usuario desconectado:", socket.id);
+  });
+});
+
+// 🚀 Iniciar servidor
 const PORT = process.env.PORT || 8080;
-app.listen(PORT, '0.0.0.0', (err) => {
-  err
-  ? console.log("explotó todo 😫")
-  : console.log(`Servidor corre en http://localhost:${PORT}`);
+server.listen(PORT, "0.0.0.0", (err) => {
+  if (err) {
+    console.log("explotó todo 😫");
+  } else {
+    console.log(`Servidor corre en http://localhost:${PORT}`);
+  }
 });
